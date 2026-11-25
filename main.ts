@@ -29,6 +29,11 @@ const ONE_WORD = /^[A-Za-z]+$/;
 // Plain ASCII, so every character is exactly one byte.
 const ASCII_ONLY = /^[\x00-\x7F]*$/;
 
+// Hidden characters that no eye would catch: C0 controls, DEL, and
+// zero-width / invisible format characters. A word containing one of
+// these is not the word it appears to be, so reject it outright.
+const HIDDEN_CHARS = /[\x00-\x1F\x7F\u200B-\u200F\uFEFF]/;
+
 // Gather every problem with the candidate instead of stopping at the
 // first one, then report them all together in a single error.
 function collectProblems(candidate: string): string[] {
@@ -47,6 +52,9 @@ function collectProblems(candidate: string): string[] {
   }
   if (!ASCII_ONLY.test(candidate)) {
     problems.push("must be plain ASCII");
+  }
+  if (HIDDEN_CHARS.test(candidate)) {
+    problems.push("must not contain control or hidden characters");
   }
   if (Buffer.byteLength(candidate, "utf-8") !== candidate.length) {
     problems.push("every character must be exactly one byte");
@@ -67,7 +75,9 @@ function emitEntry(): void {
   // Read the file back and confirm it holds the word and nothing else.
   const onDisk = readFileSync(DESTINATION, "utf-8");
   if (onDisk !== WORD) {
-    throw new Error("entry file does not match the word");
+    throw new Error(
+      `entry file ${DESTINATION} does not match the word: expected ${JSON.stringify(WORD)}, found ${JSON.stringify(onDisk)}`,
+    );
   }
 
   console.log(`wrote ${WORD.length}-character word to ${DESTINATION}`);
