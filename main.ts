@@ -1,55 +1,76 @@
-// The Word You'd Delete From the Dictionary.
+// The one word to strike from the dictionary, forever.
 //
-// Writes the single word to erase from the dictionary forever to
-// /output/entry.txt. The gate allows 1 to 77 characters of UTF-8 text,
-// and the judge wants exactly one word with nothing added around it.
+// This program's only job is to place that word — and nothing else —
+// into /output/entry.txt. The gate accepts UTF-8 text of 1–77
+// characters, and the brief asks for exactly one word, so the file
+// must contain the word alone: no explanation, no punctuation, no
+// trailing newline.
 //
-// The pick is "Moist": the word people love to hate for its sound alone.
-// Erasing it lands the joke the moment the word is gone — no caption
-// or defence needed — and the gap it leaves is instantly understood,
-// because everyone has heard someone flinch at saying it.
+// The choice is "Moist". It is the word people flinch at just for
+// how it sounds, which makes deleting it funny the instant the word
+// is gone: the joke needs no caption, and the hole it leaves is
+// obvious to anyone who has ever heard someone wince at it.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-const TEXT = "Moist";
+// The single word this entry deletes from the dictionary.
+const WORD = "Moist";
 
-const MAX_CHARS = 77;
-const OUT_PATH = "/output/entry.txt";
+// Where the grader looks for the entry.
+const DESTINATION = "/output/entry.txt";
 
-function validate(text: string): void {
-  if (text.length < 1 || text.length > MAX_CHARS) {
-    throw new Error(
-      `entry text is ${text.length} characters, outside the 1-${MAX_CHARS} limit`,
+// Longest text the gate accepts.
+const LONGEST_ALLOWED = 77;
+
+// Letters only, at least one of them: that is what "one word" means here.
+const ONE_WORD = /^[A-Za-z]+$/;
+
+// Plain ASCII, so every character is exactly one byte.
+const ASCII_ONLY = /^[\x00-\x7F]*$/;
+
+// Gather every problem with the candidate instead of stopping at the
+// first one, then report them all together in a single error.
+function collectProblems(candidate: string): string[] {
+  const problems: string[] = [];
+
+  if (candidate.length < 1 || candidate.length > LONGEST_ALLOWED) {
+    problems.push(
+      `length ${candidate.length} is outside the 1-${LONGEST_ALLOWED} character range`,
     );
   }
-  if (text !== text.trim()) {
-    throw new Error("entry text must not start or end with whitespace");
+  if (candidate.trim() !== candidate) {
+    problems.push("leading or trailing whitespace is not allowed");
   }
-  if (/\s/.test(text)) {
-    throw new Error("entry must be a single word, with no whitespace inside it");
+  if (!ONE_WORD.test(candidate)) {
+    problems.push("must be a single word made of letters only");
   }
-  if (!/^[A-Za-z]+$/.test(text)) {
-    throw new Error("entry must be one word of plain letters only");
+  if (!ASCII_ONLY.test(candidate)) {
+    problems.push("must be plain ASCII");
   }
-  if (Buffer.byteLength(text, "utf-8") !== text.length) {
-    throw new Error("entry text must be plain ASCII, one byte per character");
+  if (Buffer.byteLength(candidate, "utf-8") !== candidate.length) {
+    problems.push("every character must be exactly one byte");
   }
+
+  return problems;
 }
 
-function main(): void {
-  validate(TEXT);
-  mkdirSync(dirname(OUT_PATH), { recursive: true });
-  writeFileSync(OUT_PATH, TEXT, "utf-8");
-  const written = readFileSync(OUT_PATH, "utf-8");
-  if (written !== TEXT) {
-    throw new Error("verification failed: file content differs from entry text");
+function emitEntry(): void {
+  const problems = collectProblems(WORD);
+  if (problems.length > 0) {
+    throw new Error(`entry rejected: ${problems.join("; ")}`);
   }
-  // No trailing newline: the file must hold the word and nothing else.
-  if (written.endsWith("\n")) {
-    throw new Error("verification failed: file must not end with a newline");
+
+  mkdirSync(dirname(DESTINATION), { recursive: true });
+  writeFileSync(DESTINATION, WORD, "utf-8");
+
+  // Read the file back and confirm it holds the word and nothing else.
+  const onDisk = readFileSync(DESTINATION, "utf-8");
+  if (onDisk !== WORD) {
+    throw new Error("entry file does not match the word");
   }
-  console.log(`wrote one word (${TEXT.length} characters) to ${OUT_PATH}`);
+
+  console.log(`wrote ${WORD.length}-character word to ${DESTINATION}`);
 }
 
-main();
+emitEntry();
